@@ -98,13 +98,103 @@ These exercises will reiterate what you learned in the "Mapping data with R" tut
 
   1. Add the `Starbucks` locations to a world map. Add an aesthetic to the world map that sets the color of the points according to the ownership type. What, if anything, can you deduce from this visualization?  
 
+```{r}
+starbucks_ <- Starbucks %>% 
+  rename(ownership_type = "Ownership Type")
+
+world <- get_stamenmap(
+    bbox = c(left = -180, bottom = -57, right = 179, top = 82.1), 
+    maptype = "toner-lite",
+    zoom = 2)
+
+ggmap(world) + 
+  geom_point(data = starbucks_, 
+             aes(x = Longitude, y = Latitude, 
+                 color = ownership_type), 
+             alpha = .3, 
+             size = .1) +
+  labs(title = "Starbucks Worldwide by Ownership",
+       x = "Longitude",
+       y = "Latitude",
+       color = "Ownership Type") +
+  guides(color = guide_legend(override.aes = list(size = 5, alpha = 1))) +
+  scale_color_viridis_d() +
+  theme_map()
+```
+This visualization suggests that while North American has mostly Company Owned and Licensed Starbucks, parts of Europe, India, and East Asia (particularly Japan) tend towards Joint Venture Starbucks.
+
   2. Construct a new map of Starbucks locations in the Twin Cities metro area (approximately the 5 county metro area).  
+
+```{r}
+twin_cities <- get_stamenmap(
+    bbox = c(left = -93.4, bottom = 44.8, right = -92.9, top = 45.1), 
+    maptype = "toner-lite",
+    zoom = 2)
+```
+
+```{r}
+twin_cities <- get_stamenmap(
+    bbox = c(left = -93.4, bottom = 44.8, right = -92.9, top = 45.1), 
+    maptype = "toner-lite",
+    zoom = 11)
+
+
+ggmap(twin_cities) + 
+  geom_point(data = Starbucks, 
+             aes(x = Longitude, y = Latitude), 
+             alpha = 1, 
+             size = 1,
+             color = "darkgreen") +
+  labs(title = "Starbucks in the Twin Cities Metro Area") +
+  theme_map()
+```
 
   3. In the Twin Cities plot, play with the zoom number. What does it do?  (just describe what it does - don't actually include more than one map).  
 
+Going to a lower zoom zooms in closer to the map, making the labels much larger, while going to a higher zoom does the opposite, zooming out to a larger picture with much smaller labels.
+
   4. Try a couple different map types (see `get_stamenmap()` in help and look at `maptype`). Include a map with one of the other map types.  
 
+```{r}
+twin_cities <- get_stamenmap(
+    bbox = c(left = -93.4, bottom = 44.8, right = -92.9, top = 45.1), 
+    maptype = "watercolor",
+    zoom = 11)
+
+
+ggmap(twin_cities) + 
+  geom_point(data = Starbucks, 
+             aes(x = Longitude, y = Latitude), 
+             alpha = 1, 
+             size = 1,
+             color = "darkgreen") +
+  labs(title = "Starbucks in the Twin Cities Metro Area") +
+  theme_map()
+```
+
   5. Add a point to the map that indicates Macalester College and label it appropriately. There are many ways you can do think, but I think it's easiest with the `annotate()` function (see `ggplot2` cheatsheet).
+
+```{r}
+twin_cities <- get_stamenmap(
+    bbox = c(left = -93.4, bottom = 44.8, right = -92.9, top = 45.1), 
+    maptype = "toner-lite",
+    zoom = 11)
+
+
+ggmap(twin_cities) + 
+  geom_point(data = Starbucks, 
+             aes(x = Longitude, y = Latitude), 
+             alpha = 1, 
+             size = 1,
+             color = "darkgreen") +
+  annotate(geom = "point",
+           x = -93, y = 45,
+           color = "brown1") +
+  geom_text(aes(label = "Macalester College"), 
+                size = 2.5,
+                x = -93, y = 44.99) +
+  theme_map()
+```
 
 ### Choropleth maps with Starbucks data (`geom_map()`)
 
@@ -125,7 +215,35 @@ starbucks_with_2018_pop_est <-
 
   6. **`dplyr` review**: Look through the code above and describe what each line of code does.
 
+As the original census data had the each state capitalized with a dot before it, the separate function put the dots all into one column, and the states by themselves in another column, and extra data left over was merged. The select function removed the dot column, and state was mutated to all lower case using 'str_to_lower'. A new dataset, 'starbucks_with_2018_pop_est' was then created by doing a left join of the 'starbucks_us_by_state' and 2018 census datasets, by state name. Finally, the mutate function was used to create the new variable 'starbucks_per_10000', by dividing 'n', the count of Starbucks in each state, by the estimated population of each state in 2018, from the census data, then multiplying the quotient by 10,000.
+
   7. Create a choropleth map that shows the number of Starbucks per 10,000 people on a map of the US. Use a new fill color, add points for all Starbucks in the US (except Hawaii and Alaska), add an informative title for the plot, and include a caption that says who created the plot (you!). Make a conclusion about what you observe.
+
+```{r}
+states_map <- map_data("state")
+
+starbucks_with_2018_pop_est %>% 
+  ggplot() +
+  geom_map(map = states_map,
+           aes(map_id = state_name,
+               fill = starbucks_per_10000)) +
+  geom_point(data = Starbucks %>% filter(Country == "US", 
+                                  `State/Province` %in% c("AK", "HI") == FALSE),
+             aes(x = Longitude, y = Latitude),
+             size = .05,
+             alpha = .2,
+             color = "darkgoldenrod2") +
+  expand_limits(x = states_map$long, y = states_map$lat) + 
+  labs(title = "Starbucks Locations and Distribution by Population in the US",
+       caption = "Created by Maddie Tuggle",
+       fill = "Starbucks per 10,000 people") +
+  scale_fill_binned() +
+  theme_map() +
+  theme(legend.background = element_blank()) +
+  guides(fill = guide_legend(title.position = "bottom"))
+```
+
+The points of Starbucks locations serve as a indicator of the biggest cities in America, while the Starbucks distribution shows that despite the concentration of Starbucks in the highest populated cities, the corresponding states may not have as many Starbucks per 10,000 people, due to either their high population or the lack of Starbucks outside of big cities in these states.  Colorado and Washington have the most Starbucks relative to their population, which makes sense at least for Washington, as Seattle houses Starbucks Headquarters. 
 
 ### A few of your favorite things (`leaflet`)
 
@@ -133,10 +251,66 @@ starbucks_with_2018_pop_est <-
 
   * Create a data set using the `tibble()` function that has 10-15 rows of your favorite places. The columns will be the name of the location, the latitude, the longitude, and a column that indicates if it is in your top 3 favorite locations or not. For an example of how to use `tibble()`, look at the `favorite_stp_by_lisa` I created in the data R code chunk at the beginning.  
 
+```{r}
+fav_places <- tibble(
+  place = c("Home", "Cahoots(fav)", "The Naughty Greek", "Macalester College", "Indochin", 
+            "Goodwill St. Paul Outlet(fav)", "The Yarnery", "Cafe Latte", "Open Door Lake Street", 
+            "Boneshaker Books(fav)"),
+  long = c(-93.164294, -93.166159, -93.167181, 
+           -93.1712321, -93.172436, -93.178060, 
+           -93.120892, -93.136226, -93.232972, 
+           -93.239571),
+  lat = c(44.947195, 44.946479, 44.946867, 
+          44.9378965, 44.940052, 44.957597, 
+          44.946659, 44.939892, 44.948563, 
+          44.962492))
+
+fav_places_3 <- fav_places %>% 
+  mutate(fav_places, top_three = ifelse(grepl("(fav)", place), "Top Three", "Other"))
+```
+
+
   * Create a `leaflet` map that uses circles to indicate your favorite places. Label them with the name of the place. Choose the base map you like best. Color your 3 favorite places differently than the ones that are not in your top 3 (HINT: `colorFactor()`). Add a legend that explains what the colors mean.  
   
-  * Connect all your locations together with a line in a meaningful way (you may need to order them differently in the original data).  
+```{r}
+pal <- colorFactor(c("darkgreen", "darkseagreen"),
+                   fav_places_3$top_three)
+
+leaflet(data = fav_places_3) %>% 
+  addProviderTiles(providers$CartoDB.DarkMatter) %>% 
+  addCircles(lng = ~long,
+             lat = ~lat,
+             label = ~place,
+             weight = 7,
+             opacity = 1,
+             color = ~pal(top_three)) %>% 
+  addLegend(pal = pal,
+            values = ~top_three,
+            title = "Top 10 Favorite Places")
+```
   
+  * Connect all your locations together with a line in a meaningful way (you may need to order them differently in the original data).  
+
+```{r}
+pal <- colorFactor(c("darkgreen", "darkseagreen"),
+                   fav_places_3$top_three)
+
+leaflet(data = fav_places_3) %>% 
+  addProviderTiles(providers$CartoDB.DarkMatter) %>% 
+  addCircles(lng = ~long,
+             lat = ~lat,
+             label = ~place,
+             weight = 7,
+             opacity = 1,
+             color = ~pal(top_three)) %>% 
+  addPolylines(lng = ~long,
+               lat = ~lat,
+               color = col2hex("darkslategray")) %>% 
+  addLegend(pal = pal,
+            values = ~top_three,
+            title = "Top 10 Favorite Places")
+```
+
   * If there are other variables you want to add that could enhance your plot, do that now.  
   
 ## Revisiting old datasets
@@ -152,7 +326,7 @@ Two data tables are available:
 - `Trips` contains records of individual rentals
 - `Stations` gives the locations of the bike rental stations
 
-Here is the code to read in the data. We do this a little differently than usualy, which is why it is included here rather than at the top of this file. To avoid repeatedly re-reading the files, start the data import chunk with `{r cache = TRUE}` rather than the usual `{r}`. This code reads in the large dataset right away.
+Here is the code to read in the data. We do this a little differently than usually, which is why it is included here rather than at the top of this file. To avoid repeatedly re-reading the files, start the data import chunk with `{r cache = TRUE}` rather than the usual `{r}`. This code reads in the large dataset right away.
 
 ```{r cache=TRUE}
 data_site <- 
