@@ -151,7 +151,7 @@ ggmap(twin_cities) +
 
   3. In the Twin Cities plot, play with the zoom number. What does it do?  (just describe what it does - don't actually include more than one map).  
 
-Going to a lower zoom zooms in closer to the map, making the labels much larger, while going to a higher zoom does the opposite, zooming out to a larger picture with much smaller labels.
+Going to a lower zoom shows less detail, making the labels much larger, while going to a higher zoom does the opposite, zooming out to a more detailed map with much smaller labels.
 
   4. Try a couple different map types (see `get_stamenmap()` in help and look at `maptype`). Include a map with one of the other map types.  
 
@@ -340,7 +340,8 @@ Stations<-read_csv("http://www.macalester.edu/~dshuman1/data/112/DC-Stations.csv
 ```{r}
 
 ```
-  
+
+ 
   10. Only 14.4% of the trips in our data are carried out by casual users. Create a plot that shows which area(s) have stations with a much higher percentage of departures by casual users. What patterns do you notice? Also plot this on top of a map. I think it will be more clear what the patterns are.
   
 ```{r}
@@ -352,9 +353,53 @@ Stations<-read_csv("http://www.macalester.edu/~dshuman1/data/112/DC-Stations.csv
 The following exercises will use the COVID-19 data from the NYT.
 
   11. Create a map that colors the states by the most recent cumulative number of COVID-19 cases (remember, these data report cumulative numbers so you don't need to compute that). Describe what you see. What is the problem with this map?
-  
+
+```{r}
+states_map <- map_data("state")
+
+covid19 %>% 
+  group_by(state) %>% 
+  top_n(n = 1, wt = date) %>% 
+  mutate(state = str_to_lower(state)) %>% 
+  ggplot() +
+  geom_map(map = states_map,
+           aes(map_id = state,
+               fill = cases)) +
+  labs(title = "Most recent cumulative COVID-19 case count by state",
+       fill = "Cases") +
+  expand_limits(x = states_map$long, y = states_map$lat) +
+  theme_map()
+```
+
+The cases haven't been calculated relative to population, which makes the graph (and legend) more difficult to interpret and gives an inaccurate conclusion about the distribution of cases in each state. 
+
   12. Now add the population of each state to the dataset and color the states by most recent cumulative cases/10,000 people. See the code for doing this with the Starbucks data. You will need to make some modifications. 
   
+```{r}
+states_map <- map_data("state")
+
+rec_cum_covid19 <- covid19%>% 
+  group_by(state) %>% 
+  top_n(n = 1, wt = date) %>% 
+  mutate(state = str_to_lower(state))
+
+covid19_pop <-
+  rec_cum_covid19 %>% 
+  left_join(census_pop_est_2018,
+            by = c("state")) %>% 
+  mutate(cases_per_10000 = (cases/est_pop_2018)*10000)
+
+covid19_pop %>% 
+  ggplot() +
+  geom_map(map = states_map,
+           aes(map_id = state,
+               fill = cases_per_10000)) +
+  labs(title = "Distribution of COVID-19 cases by state",
+       fill = "Cases per 10,000 people") +
+  expand_limits(x = states_map$long, y = states_map$lat) +
+  theme_map()
+```
+
   13. **CHALLENGE** Choose 4 dates spread over the time period of the data and create the same map as in exercise 12 for each of the dates. Display the four graphs together using faceting. What do you notice?
   
 ## Minneapolis police stops
@@ -362,12 +407,40 @@ The following exercises will use the COVID-19 data from the NYT.
 These exercises use the datasets `MplsStops` and `MplsDemo` from the `carData` library. Search for them in Help to find out more information.
 
   14. Use the `MplsStops` dataset to find out how many stops there were for each neighborhood and the proportion of stops that were for a suspicious vehicle or person. Sort the results from most to least number of stops. Save this as a dataset called `mpls_suspicious` and display the table.  
-  
+
+
+```{r}
+mpls_suspicious <- MplsStops %>% 
+  group_by(neighborhood, problem) %>% 
+  summarise(n = n()) %>% 
+  pivot_wider(names_from = problem,
+              values_from = n) %>% 
+  mutate(nh_sum = suspicious + traffic,
+         nh_sus = suspicious/nh_sum) %>% 
+  arrange(desc(nh_sum))
+
+mpls_suspicious
+```
+
   15. Use a `leaflet` map and the `MplsStops` dataset to display each of the stops on a map as a small point. Color the points differently depending on whether they were for suspicious vehicle/person or a traffic stop (the `problem` variable). HINTS: use `addCircleMarkers`, set `stroke = FAlSE`, use `colorFactor()` to create a palette.  
+  
+```{r}
+pal <- colorFactor(palette = c("darkblue", "darkred"),
+                   levels = c("suspicious", "traffic"))
+
+leaflet(data = MplsStops) %>% 
+  addTiles() %>% 
+  addCircleMarkers(lng = ~long,
+                   lat = ~lat,
+                   color = ~pal(problem),
+                   radius = 1,
+                   stroke = FALSE)
+```
+ 
   
   16. Save the folder from moodle called Minneapolis_Neighborhoods into your project/repository folder for this assignment. Make sure the folder is called Minneapolis_Neighborhoods. Use the code below to read in the data and make sure to **delete the `eval=FALSE`**. Although it looks like it only links to the .sph file, you need the entire folder of files to create the `mpls_nbhd` data set. These data contain information about the geometries of the Minneapolis neighborhoods. Using the `mpls_nbhd` dataset as the base file, join the `mpls_suspicious` and `MplsDemo` datasets to it by neighborhood (careful, they are named different things in the different files). Call this new dataset `mpls_all`.
 
-```{r, eval=FALSE}
+```{r}
 mpls_nbhd <- st_read("Minneapolis_Neighborhoods/Minneapolis_Neighborhoods.shp", quiet = TRUE)
 ```
 
